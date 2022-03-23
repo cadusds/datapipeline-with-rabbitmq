@@ -1,0 +1,65 @@
+version: "3.1"
+services:
+  rabbitmq3:
+    image: rabbitmq:3.9-management-alpine
+    container_name: 'rabbitmq'
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    ports:
+      # AMQP protocol port
+      - '5672:5672'
+      # HTTP management UI
+      - '15672:15672'
+  
+  db:
+    image: postgres
+    container_name: db
+    restart: on-failure
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: testdb
+    volumes:
+      - ./.docker/db:/docker-entrypoint-initdb.d
+    ports:
+      - 5432:5432
+
+  receiver:
+    restart: on-failure
+    build: .
+    container_name: receiver
+    command: python3 src/receive.py
+    volumes:
+      - .:/code
+    depends_on:
+      - rabbitmq3
+
+  subscriber:
+    restart: on-failure
+    build: .
+    container_name: subscriber
+    command: python3 src/subscriber.py
+    volumes:
+      - .:/code
+    depends_on:
+      - db  
+    environment:
+      DB_USER: admin
+      DB_PASSWORD: admin
+      DB_NAME: testdb
+
+  # mock-data:
+  #   restart: on-failure
+  #   build: .
+  #   container_name: mock-data
+  #   entrypoint: ./docker-entry.sh
+  #   volumes:
+  #     - .:/code
+  #   depends_on:
+  #     - subscriber  
+  #   environment:
+  #     DB_USER: admin
+  #     DB_PASSWORD: admin
+  #     DB_NAME: testdb
+  #     NUMBER_OF_USERS: 10
